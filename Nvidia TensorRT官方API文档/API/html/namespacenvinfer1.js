@@ -1,0 +1,27 @@
+var namespacenvinfer1 =
+[
+    [ "Dims2", "classnvinfer1_1_1_dims2.html", "classnvinfer1_1_1_dims2" ],
+    [ "Dims3", "classnvinfer1_1_1_dims3.html", "classnvinfer1_1_1_dims3" ],
+    [ "Dims4", "classnvinfer1_1_1_dims4.html", "classnvinfer1_1_1_dims4" ],
+    [ "IActivationLayer", "classnvinfer1_1_1_i_activation_layer.html", "classnvinfer1_1_1_i_activation_layer" ],
+    [ "IBuilder", "classnvinfer1_1_1_i_builder.html", "classnvinfer1_1_1_i_builder" ],
+    [ "IConcatenationLayer", "classnvinfer1_1_1_i_concatenation_layer.html", "classnvinfer1_1_1_i_concatenation_layer" ],
+    [ "IConvolutionLayer", "classnvinfer1_1_1_i_convolution_layer.html", "classnvinfer1_1_1_i_convolution_layer" ],
+    [ "ICudaEngine", "classnvinfer1_1_1_i_cuda_engine.html", "classnvinfer1_1_1_i_cuda_engine" ],
+    [ "IDeconvolutionLayer", "classnvinfer1_1_1_i_deconvolution_layer.html", "classnvinfer1_1_1_i_deconvolution_layer" ],
+    [ "IElementWiseLayer", "classnvinfer1_1_1_i_element_wise_layer.html", "classnvinfer1_1_1_i_element_wise_layer" ],
+    [ "IExecutionContext", "classnvinfer1_1_1_i_execution_context.html", "classnvinfer1_1_1_i_execution_context" ],
+    [ "IFullyConnectedLayer", "classnvinfer1_1_1_i_fully_connected_layer.html", "classnvinfer1_1_1_i_fully_connected_layer" ],
+    [ "ILayer", "classnvinfer1_1_1_i_layer.html", "classnvinfer1_1_1_i_layer" ],
+    [ "ILogger", "classnvinfer1_1_1_i_logger.html", "classnvinfer1_1_1_i_logger" ],
+    [ "ILRNLayer", "classnvinfer1_1_1_i_l_r_n_layer.html", "classnvinfer1_1_1_i_l_r_n_layer" ],
+    [ "INetworkDefinition", "classnvinfer1_1_1_i_network_definition.html", "classnvinfer1_1_1_i_network_definition" ],
+    [ "IOutputDimensionsFormula", "classnvinfer1_1_1_i_output_dimensions_formula.html", "classnvinfer1_1_1_i_output_dimensions_formula" ],
+    [ "IPoolingLayer", "classnvinfer1_1_1_i_pooling_layer.html", "classnvinfer1_1_1_i_pooling_layer" ],
+    [ "IProfiler", "classnvinfer1_1_1_i_profiler.html", "classnvinfer1_1_1_i_profiler" ],
+    [ "IRuntime", "classnvinfer1_1_1_i_runtime.html", "classnvinfer1_1_1_i_runtime" ],
+    [ "IScaleLayer", "classnvinfer1_1_1_i_scale_layer.html", "classnvinfer1_1_1_i_scale_layer" ],
+    [ "ISoftMaxLayer", "classnvinfer1_1_1_i_soft_max_layer.html", "classnvinfer1_1_1_i_soft_max_layer" ],
+    [ "ITensor", "classnvinfer1_1_1_i_tensor.html", "classnvinfer1_1_1_i_tensor" ],
+    [ "Weights", "classnvinfer1_1_1_weights.html", "classnvinfer1_1_1_weights" ]
+];

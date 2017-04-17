@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIE User Guide</title>
+<link rel="stylesheet" href="https://stackedit.io/res-min/themes/base.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="container"><h1 id="gie-user-guide">GIE User Guide</h1>
+
+<p>The NVIDIA GPU Inference Engine (GIE) is a C++ library that facilitates high performance inference on NVIDIA GPUs. It takes a network definition and optimizes it by merging tensors and layers, transforming weights, choosing efficient intermediate data formats, and selecting from a large kernel catalog based on layer parameters and measured performance.</p>
+
+<p>This release of GIE is built with gcc 4.8.</p>
+
+<p>GIE has the following layer types:</p>
+
+<ul>
+<li><strong>Convolution</strong>, with or without bias. Currently only 2D convolutions (i.e. 4D input and output tensors) are supported. <strong>Note</strong>: The operation this layer performs is actually a correlation, which is a consideration if you are formatting weights to import via GIE’s API rather than the caffe parser library. </li>
+<li><strong>Activation</strong>: ReLU, tanh and sigmoid.</li>
+<li><strong>Pooling</strong>: max and average.</li>
+<li><strong>Scale</strong>: per-tensor, per channel or per-weight affine transformation and exponentiation by constant values. <strong>Batch Normalization</strong> can be implemented using the Scale layer.</li>
+<li><strong>ElementWise</strong>: sum, product or max of two tensors.</li>
+<li><strong>LRN</strong>: cross-channel only.</li>
+<li><strong>Fully-connected</strong> with or without bias</li>
+<li><strong>SoftMax</strong>: cross-channel only</li>
+<li><strong>Deconvolution</strong>, with and without bias</li>
+</ul>
+
+<p>While GIE is independent of any framework, the package includes a parser for caffe models named NvCaffeParser, which provides a simple mechanism for importing network definitions. NvCaffeParser uses the above layers to implement caffe’s Convolution, ReLU, Sigmoid, TanH, Pooling, Power, BatchNorm, Eltwise, LRN,  InnerProduct, SoftMax, Scale, and Deconvolution layers. Caffe features not supported by GIE include:</p>
+
+<ul>
+<li>Deconvolution groups</li>
+<li>PReLU</li>
+<li>Scale, other than per-channel scaling</li>
+<li><p>EltWise with more than two inputs</p>
+
+<p><strong>Note:</strong> GIE’s caffe parser does not support legacy formats in caffe prototxt - in particular, layer types are expected to be expressed in the prototxt as strings delimited by double quotes.</p></li>
+</ul>
+
+
+
+<h1 id="getting-started">Getting Started</h1>
+
+<p>There are two phases to using GIE:</p>
+
+<ul>
+<li>In the <em>build</em> phase, the toolkit takes a network definition, performs optimizations, and generates the inference engine. </li>
+<li>In the <em>execution</em> phase, the engine runs inference tasks using input and output buffers on the GPU.</li>
+</ul>
+
+<p>The build phase can take considerable time, especially when running on embedded platforms. So a typical application will build an engine once, and then serialize it for later use.</p>
+
+<p>The build phase performs the following optimizations on the layer graph:</p>
+
+<ul>
+<li>elimination of layers whose outputs are not used</li>
+<li>fusion of convolution, bias and ReLU operations</li>
+<li>aggregation of operations with sufficiently similar parameters and the same source tensor (for example, the 1x1 convolutions in GoogleNet v5’s inception module)</li>
+<li>elision of concatenation layers by directing layer outputs to the correct eventual destination.</li>
+</ul>
+
+<p>In addition it runs layers on dummy data to select the fastest from its kernel catalog, and performs weight preformatting and memory optimization where appropriate.</p>
+
+
+
+<h2 id="the-network-definition">The Network Definition</h2>
+
+<p>A <em>network definition</em> consists of a sequence of layers, and a set of tensors. </p>
+
+<p>Each <em>layer</em> computes a set of output tensors from a set of input tensors.  Layers have parameters, e.g. convolution size and stride, and convolution filter weights.</p>
+
+<p>A <em>tensor</em> is either an input to the network, or an output of a layer. Tensors have a datatype specifying their precision (16- and 32-bit floats are currently supported) and three dimensions (channels, width, height). The dimensions of an input tensor are defined by the application, and for output tensors they are inferred by the builder.</p>
+
+<p>Each layer and tensor has a name, which can be useful when profiling or reading GIE’s build log (see Logging below) </p>
+
+<p>When using the caffe parser, tensor and layer names are taken from the caffe prototxt. </p>
+
+
+
+<h2 id="samplemnist">SampleMNIST</h2>
+
+<p>The MNIST sample demonstrates typical build and execution phases using a caffe model trained on the MNIST dataset using the <a href="https://github.com/NVIDIA/DIGITS/blob/master/docs/GettingStarted.md">NVIDIA DIGITS tutorial</a>.</p>
+
+
+
+<h3 id="logging">Logging</h3>
+
+<p>GIE requires a logging interface to be implemented, through which it reports errors, warnings, and informational messages. </p>
+
+<pre><code>class Logger : public ILogger           
+{
+    void log(Severity severity, const char* msg) override
+    {
+        // suppress info-level messages
+        if (severity != Severity::kINFO)
+            std::cout &lt;&lt; msg &lt;&lt; std::endl;
+    }
+} gLogger;
+</code></pre>
+
+<p>Here we suppress informational messages, and report only warnings and errors.</p>
+
+
+
+<h3 id="the-build-phase-caffetogiemodel">The Build Phase - <code>caffeToGIEModel</code></h3>
+
+<p>First we create the GIE builder. The application must implement a logging interface, through which GIE will provide information about optimization stages during the build phase, and also warnings and error information. </p>
+
+<pre><code>IBuilder* builder = createInferBuilder(gLogger);
+</code></pre>
+
+<p>Then we create the network definition structure, which we populate from a caffe model using the caffe parser library: </p>
+
+<pre><code>INetworkDefinition* network = infer-&gt;createNetwork();
+CaffeParser* parser = createCaffeParser();
+std::unordered_map&lt;std::string, infer1::Tensor&gt; blobNameToTensor;
+const IBlobNameToTensor* blobNameToTensor = 
+    parser-&gt;parse(locateFile(deployFile).c_str(),
+                             locateFile(modelFile).c_str(),
+                             *network,
+                             DataType::kFLOAT);
+</code></pre>
+
+<p>In this sample, we instruct the parser to generate a network whose weights are 32-bit floats. As well as populating the network definition, the parser returns a dictionary that maps from caffe blob names to GIE tensors. </p>
+
+<p><strong>Note:</strong> A GIE network definition has no notion of in-place operation - e.g. the input and output tensors of a ReLU are different. When a caffe network uses an in-place operation, the GIE tensor returned in the dictionary corresponds to the last write to that blob. For example, if a convolution creates a blob and is followed by an in-place ReLU, that blob’s name will map to the GIE tensor which is the output of the ReLU.</p>
+
+<p>Since the caffe model does not tell us which tensors are the outputs of the network, we need to specify these explicitly after parsing:</p>
+
+<pre><code>for (auto&amp; s : outputs)
+    network-&gt;markOutput(*blobNameToTensor-&gt;find(s.c_str()));
+</code></pre>
+
+<p>There is no restriction on the number of output tensors, but marking a tensor as an output may prohibit some optimizations on that tensor.</p>
+
+<p><strong>Note:</strong> at this point we have parsed the caffe model to obtain the network definition, and are ready to create the engine. However, we cannot yet release the parser object because the network definition holds weights by reference into the caffe model, not by value. It is only during the build process that the weights are read from the caffemodel.</p>
+
+<p>We next build the engine from the network definition:</p>
+
+<pre><code>builder-&gt;setMaxBatchSize(maxBatchSize);
+builder-&gt;setMaxWorkspaceSize(1 &lt;&lt; 20);
+ICudaEngine* engine = builder-&gt;buildCudaEngine(*network);
+</code></pre>
+
+<ul>
+<li><code>maxBatchSize</code> is the size for which the engine will be tuned. At execution time, smaller batches may be used, but not larger.  Note that execution of smaller batch sizes may be slower than with a GIE engine optimized for that size.</li>
+<li><code>maxWorkspaceSize</code> is the maximum amount of scratch space which the engine may use at runtime</li>
+</ul>
+
+<p>We could use the engine directly, but here we serialize it to a stream, which is the typical usage mode for GIE:</p>
+
+<pre><code>engine-&gt;serialize(gieModelStream);
+</code></pre>
+
+
+
+<h3 id="deserializing-the-engine">Deserializing the engine</h3>
+
+<p>To deserialize the engine, we create a GIE runtime object:</p>
+
+<pre><code>IRuntime* runtime = createInferRuntime(gLogger);
+ICudaEngine* engine = runtime-&gt;deserializeCudaEngine(gieModelStream);
+</code></pre>
+
+<p>We also need to create an execution context. One engine can support multiple contexts, allowing inference to be performed on multiple batches simultaneously while sharing the same weights.</p>
+
+<pre><code>IExecutionContext *context = engine-&gt;createExecutionContext();
+</code></pre>
+
+<p><strong>Note:</strong> Serialized engines are not portable across platforms or GIE versions.</p>
+
+
+
+<h3 id="the-execution-phase-doinference">The Execution Phase - <code>doInference()</code></h3>
+
+<p>The input to the engine is an array of pointers to input and output buffers on the GPU (<strong>Note:</strong> All GIE inputs and outputs are in contiguous NCHW format.) The engine can be queried for the buffer indices, using the tensor names assigned when the network was created. </p>
+
+<pre><code>int inputIndex = engine-&gt;getBindingIndex(INPUT_BLOB_NAME), 
+    outputIndex = engine-&gt;getBindingIndex(OUTPUT_BLOB_NAME);
+</code></pre>
+
+<p>In a typical production case, GIE will execute asynchronously. The <code>enqueue()</code> method will add add kernels to a cuda stream specified by the application, which may then wait on that stream for completion. The fourth parameter to <code>enqueue()</code> is an optional <code>cudaEvent</code> which will be signaled when the input buffers are no longer in use and can be refilled. </p>
+
+<p>In this sample we simply copy the input buffer to the GPU, run inference, then copy the result back and wait on the stream:</p>
+
+<pre><code>cudaMemcpyAsync(&lt;...&gt;, cudaMemcpyHostToDevice, stream);
+context.enqueue(batchSize, buffers, stream, nullptr);
+cudaMemcpyAsync(&lt;...&gt;, cudaMemcpyDeviceToHost, stream);
+cudaStreamSynchronize(stream);
+</code></pre>
+
+<p><strong>Note:</strong> The batch size must be at most the value specified when the engine was created.</p>
+
+
+
+<h2 id="samplegooglenet">SampleGoogleNet</h2>
+
+<p>SampleGoogleNet illustrates layer-based profiling and GIE’s half2 mode, which is the fastest mode for batch sizes greater than one on platforms which natively support 16-bit inference . </p>
+
+
+
+<h3 id="profiling">Profiling</h3>
+
+<p>To profile a network, implement the <code>IProfiler</code> interface and add the profiler to the execution context:</p>
+
+<pre><code>context.profiler = &amp;gProfiler;
+</code></pre>
+
+<p>Profiling is not currently supported for asynchronous execution, and so we must use GIE’s synchronous <code>execute()</code> method:</p>
+
+<pre><code>for (int i = 0; i &lt; TIMING_ITERATIONS;i++)
+    engine-&gt;execute(context, buffers);
+</code></pre>
+
+<p>After execution has completed, the profiler callback is called once for every layer. The sample accumulates layer times over invocations, and averages the time for each layer at the end. </p>
+
+<p>Observe that the layer names are modified by GIE’s layer-combining operations.</p>
+
+
+
+<h3 id="half2-mode">half2 mode</h3>
+
+<p>GIE can use 16-bit instead of 32-bit arithmetic and tensors, but this alone may not deliver significant performance benefits. Half2 is an execution mode where internal tensors interleave 16 bits from adjacent pairs of images, and is the fastest mode of operation for batch sizes greater than one.</p>
+
+<p>To use half2 mode, two additional steps are required:</p>
+
+<p>1) create an input network with 16-bit weights, by supplying the <code>DataType::kHALF2</code> parameter to the parser </p>
+
+<pre><code>const IBlobNameToTensor *blobNameToTensor = 
+  parser-&gt;parse(locateFile(deployFile).c_str(),
+                locateFile(modelFile).c_str(),
+                *network,
+                DataType::kHALF);
+</code></pre>
+
+<p>2) set the ‘half2mode’ mode in the builder when building the engine:</p>
+
+<pre><code>builder-&gt;setHalf2Mode(true);
+</code></pre>
+
+
+
+<h2 id="using-gie-with-multiple-gpus">Using GIE with multiple GPUs</h2>
+
+<p>Each <code>ICudaEngine</code> object is bound to a specific GPU when it is instantiated, either by the builder or on deserialization. To select the GPU, use <code>cudaSetDevice()</code> before calling the builder or deserializing the engine. Each <code>IExecutionContext</code> is bound to the same GPU as the engine from which it was created. When calling <code>execute()</code> or <code>enqueue()</code>, ensure that the thread is associated with the correct device by calling <code>cudaSetDevice()</code> if necessary.</p>
+
+
+
+<h2 id="data-formats">Data Formats</h2>
+
+<p>GIE network inputs and outputs are 32-bit tensors in contiguous NCHW format.</p>
+
+<p>For weights:</p>
+
+<ul>
+<li>Convolution weights are in contiguous KCRS format, where K indexes over output channels, C over input channels, and R and S over the height and width of the convolution, respectively.</li>
+<li>Fully Connected weights are in contiguous row-major layout</li>
+<li>Deconvolution weights are in contiguous CKRS format (where C, K, R and S are as above).</li>
+</ul>
+
+<h1 id="faq">FAQ</h1>
+
+<p><strong>Q: How can I use my own layer types in conjunction with GIE?</strong> <br>
+A: This release of GIE doesn’t support custom layers. To use your own layer in the middle of GIE, create two GIE pipelines, one to run before your layer and one to run afterwards.</p>
+
+<pre><code>IExecutionContext *contextA = engineA-&gt;createExecutionContext();
+IExecutionContext *contextB = engineB-&gt;createExecutionContext();
+
+&lt;...&gt;
+
+contextA.enqueue(batchSize, buffersA, stream, nullptr);
+myLayer(outputFromA, inputToB, stream);
+contextB.enqueue(batchSize, buffersB, stream, nullptr);
+</code></pre>
+
+<p>The first GIE pipeline will read the input and write to <code>outputFromA</code>, and the second will read from <code>inputToB</code> and generate the final output.</p>
+
+<p><strong>Q: How do I create an engine optimized for several possible batch sizes?</strong> <br>
+A: While GIE allows an engine optimized for a given batch size to run at any smaller size, the performance for those smaller sizes may not be as well-optimized. To optimize for multiple different batch sizes, run the builder and serialize an engine for each batch size. A future release of GIE will be able to optimize a single engine for multiple batch sizes, thereby allowing for sharing of weights where layers at different batch sizes use the same weight formats. </p></div></body>
+</html>
